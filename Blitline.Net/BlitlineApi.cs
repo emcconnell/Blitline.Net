@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading.Tasks;
 using Blitline.Net.Request;
 using Blitline.Net.Response;
 using Newtonsoft.Json;
@@ -28,6 +29,48 @@ namespace Blitline.Net
             }
         }
 
+        public async Task<BlitlineResponse> ProcessImagesAsync(BlitlineRequest blitlineRequest)
+        {
+            using (var httpClient = new HttpClient())
+            {
+                var payload = JsonConvert.SerializeObject(blitlineRequest);
+                var result = await httpClient.PostAsync(RootUrl, new FormUrlEncodedContent(new Dictionary<string, string> { { "json", payload } }));
+
+
+                return await Task.Run(() =>
+                {
+                    result.EnsureSuccessStatusCode();
+                    string content = result.Content.ReadAsStringAsync().Result;
+                    var response = JsonConvert.DeserializeObject<BlitlineResponse>(content);
+                    var correctS3BucketList = FixS3Urls(new[] { blitlineRequest });
+                    if (correctS3BucketList.Any()) response.FixS3Urls(correctS3BucketList);
+
+                    return response;
+                });
+            }
+
+            //using (var httpClient = new HttpClient())
+            //{
+            //    var payload = JsonConvert.SerializeObject(blitlineRequest);
+            //    BlitlineResponse result = null;
+            //    return await httpClient.PostAsync(RootUrl, new FormUrlEncodedContent(new Dictionary<string, string> { { "json", payload } }))
+            //              .ContinueWith((requestTask) =>
+            //                  {
+            //                      var response = requestTask.Result;
+            //                      response.EnsureSuccessStatusCode();
+
+            //                      response.Content.ReadAsStringAsync().ContinueWith((readTask) =>
+            //                          {
+            //                              result = JsonConvert.DeserializeObject<BlitlineResponse>(readTask.Result);
+            //                              return result;
+            //                          });
+
+            //                      return result;
+
+            //                  });
+            //}
+        }
+
         public BlitlineBatchResponse ProcessImages(IEnumerable<BlitlineRequest> blitlineRequests)
         {
             var payload = JsonConvert.SerializeObject(blitlineRequests.ToArray());
@@ -43,6 +86,25 @@ namespace Blitline.Net
                 
                 return response;
             }
+        }
+
+        public async Task<BlitlineBatchResponse> ProcessImagesAsync(IEnumerable<BlitlineRequest> blitlineRequests)
+        {
+            var httpClient = new HttpClient();
+            var payload = JsonConvert.SerializeObject(blitlineRequests.ToArray());
+            var result = await httpClient.PostAsync(RootUrl, new FormUrlEncodedContent(new Dictionary<string, string> { { "json", payload } }));
+            result.EnsureSuccessStatusCode();
+
+            string content = await result.Content.ReadAsStringAsync();
+
+            return await Task.Run(() =>
+            {
+                var response = JsonConvert.DeserializeObject<BlitlineBatchResponse>(content);
+                var correctS3BucketList = FixS3Urls(blitlineRequests);
+                if (correctS3BucketList.Any()) response.FixS3Urls(correctS3BucketList);
+
+                return response;
+            });
         }
 
         private Dictionary<string, string> FixS3Urls(IEnumerable<BlitlineRequest> blitlineRequests)

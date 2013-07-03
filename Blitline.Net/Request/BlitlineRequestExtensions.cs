@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Blitline.Net.Response;
 
 namespace Blitline.Net.Request
@@ -9,6 +10,12 @@ namespace Blitline.Net.Request
         {
             var api = new BlitlineApi();
             return api.ProcessImages(request);
+        }
+
+        public static Task<BlitlineResponse> SendAsync(this BlitlineRequest request)
+        {
+            var api = new BlitlineApi();
+            return api.ProcessImagesAsync(request);
         }
 
         public static BlitlineBatchResponse Send(this IEnumerable<BlitlineRequest> requests)
